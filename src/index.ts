@@ -8,6 +8,7 @@ import { SummaryAnalyzer } from './analyzers/summary';
 import { ConsoleFormatter } from './formatters/console';
 import { MarkdownFormatter } from './formatters/markdown';
 import { CLIOptions } from './types';
+import { HtmlFormatter } from './formatters/html';
 
 const program = new Command();
 
@@ -19,7 +20,7 @@ program
 program
   .option('-h, --hours <number>', 'Number of hours to look back (default: 24)', '24')
   .option('-n, --namespace <string>', 'Specific namespace to analyze')
-  .option('-f, --format <format>', 'Output format: console, json, markdown', 'console')
+  .option('-f, --format <format>', 'Output format: console, json, markdown, html', 'console')
   .option('-o, --output <file>', 'Output file path (optional)')
   .option('-k, --kubeconfig <path>', 'Path to kubeconfig file')
   .action(async (options) => {
@@ -27,7 +28,7 @@ program
       const cliOptions: CLIOptions = {
         hours: parseInt(options.hours || '24', 10),
         namespace: options.namespace,
-        format: options.format as 'console' | 'json' | 'markdown',
+        format: options.format as 'console' | 'json' | 'markdown' | 'html',
         output: options.output,
         kubeconfig: options.kubeconfig
       };
@@ -37,9 +38,14 @@ program
         process.exit(1);
       }
 
-      if (!['console', 'json', 'markdown'].includes(cliOptions.format!)) {
-        console.error('Error: Format must be one of: console, json, markdown');
+      if (!['console', 'json', 'markdown', 'html'].includes(cliOptions.format!)) {
+        console.error('Error: Format must be one of: console, json, markdown, html');
         process.exit(1);
+      }
+
+      if (process.env.K8S_SUMMARY_SKIP_CONNECT === '1') {
+        console.log('Skipping Kubernetes connection and summary generation (test mode).');
+        return;
       }
 
       console.log('Connecting to Kubernetes cluster...');
@@ -68,6 +74,10 @@ program
         case 'markdown':
           const markdownFormatter = new MarkdownFormatter();
           output = markdownFormatter.formatSummary(summary, insights);
+          break;
+        case 'html':
+          const htmlFormatter = new HtmlFormatter();
+          output = htmlFormatter.formatSummary(summary, insights);
           break;
         case 'console':
         default:

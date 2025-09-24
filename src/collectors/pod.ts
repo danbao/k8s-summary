@@ -1,6 +1,6 @@
 import * as k8s from '@kubernetes/client-node';
 import { K8sClient } from '../utils/k8s-client';
-import { PodRestart } from '../types';
+import { PodRestart, PodHealthRecord, PodPhaseSummary } from '../types';
 
 export class PodCollector {
   private client: K8sClient;
@@ -59,13 +59,8 @@ export class PodCollector {
     return restarts.sort((a, b) => b.restartCount - a.restartCount);
   }
 
-  async collectAbnormalPods(namespace?: string) {
-    const abnormalPods: Array<{
-      name: string;
-      namespace: string;
-      status: string;
-      reason?: string;
-    }> = [];
+  async collectAbnormalPods(namespace?: string): Promise<PodHealthRecord[]> {
+    const abnormalPods: PodHealthRecord[] = [];
     
     const coreV1 = this.client.getCoreV1Api();
     
@@ -98,7 +93,9 @@ export class PodCollector {
             name: pod.metadata?.name || 'unknown',
             namespace: pod.metadata?.namespace || 'default',
             status: phase,
-            reason
+            reason,
+            nodeName: pod.spec?.nodeName,
+            startTime: pod.status?.startTime ? new Date(pod.status.startTime) : undefined
           });
         }
       }
@@ -107,6 +104,28 @@ export class PodCollector {
     }
 
     return abnormalPods;
+  }
+
+  async collectPodPhaseBreakdown(namespace?: string): Promise<PodPhaseSummary[]> {
+    const breakdownMap = new Map<string, number>();
+    const coreV1 = this.client.getCoreV1Api();
+
+    try {
+      const response = namespace
+        ? await coreV1.listNamespacedPod(namespace)
+        : await coreV1.listPodForAllNamespaces();
+
+      for (const pod of response.body.items) {
+        const phase = pod.status?.phase || 'Unknown';
+        breakdownMap.set(phase, (breakdownMap.get(phase) || 0) + 1);
+      }
+    } catch (error) {
+      console.error('Error collecting pod phase breakdown:', error);
+    }
+
+    return Array.from(breakdownMap.entries())
+      .map(([phase, count]) => ({ phase, count }))
+      .sort((a, b) => a.phase.localeCompare(b.phase));
   }
 
   async getTotalPodCount(namespace?: string): Promise<number> {

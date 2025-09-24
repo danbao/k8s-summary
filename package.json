@@ -16,6 +16,7 @@
     "summary:prod": "npm run dev -- --namespace production",
     "summary:last2h": "npm run dev -- --hours 2",
     "test:structure": "node scripts/test-structure.js",
+    "test:unit": "ts-node tests/html-formatter.test.ts",
     "clean": "rm -rf dist/",
     "rebuild": "npm run clean && npm run build"
   },

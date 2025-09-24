@@ -8,6 +8,8 @@ export class ConsoleFormatter {
 
     output.push(chalk.bold.blue('=== K8S Daily Summary Report ==='));
     output.push(chalk.gray(`Time Range: ${summary.timeRange.start.toLocaleString()} - ${summary.timeRange.end.toLocaleString()}`));
+    output.push(chalk.gray(`Namespace: ${summary.context.namespace || 'All namespaces'}`));
+    output.push(chalk.gray(`Lookback: Last ${summary.context.hours} hours`));
     output.push('');
 
     output.push(this.formatPodSummary(summary));
@@ -30,6 +32,24 @@ export class ConsoleFormatter {
     output.push(chalk.green(`- Total Pods: ${summary.pods.total}`));
     output.push(chalk.yellow(`- Restarted Pods: ${summary.pods.restarted.length}`));
     output.push(chalk.red(`- Abnormal Pods: ${summary.pods.abnormal.length}`));
+    output.push(chalk.redBright(`- Failed Pods: ${summary.pods.failed.length}`));
+
+    if (summary.pods.statusBreakdown.length > 0) {
+      output.push('');
+      output.push(chalk.bold('Phase Breakdown:'));
+
+      const phaseTable = new Table({
+        head: [chalk.bold('Phase'), chalk.bold('Count')],
+        colWidths: [20, 10]
+      });
+
+      for (const phase of summary.pods.statusBreakdown) {
+        const value = phase.phase.toLowerCase() === 'failed' ? chalk.red(phase.count) : phase.count;
+        phaseTable.push([phase.phase, value]);
+      }
+
+      output.push(phaseTable.toString());
+    }
 
     if (summary.pods.restarted.length > 0) {
       output.push('');
@@ -72,9 +92,11 @@ export class ConsoleFormatter {
           chalk.bold('Pod Name'),
           chalk.bold('Namespace'),
           chalk.bold('Status'),
-          chalk.bold('Reason')
+          chalk.bold('Reason'),
+          chalk.bold('Node'),
+          chalk.bold('Start Time')
         ],
-        colWidths: [30, 20, 15, 30]
+        colWidths: [28, 18, 12, 25, 18, 22]
       });
 
       for (const pod of summary.pods.abnormal.slice(0, 10)) {
@@ -82,7 +104,9 @@ export class ConsoleFormatter {
           pod.name,
           pod.namespace,
           this.colorizeStatus(pod.status),
-          pod.reason || 'Unknown'
+          pod.reason || 'Unknown',
+          pod.nodeName || 'Unknown',
+          pod.startTime ? pod.startTime.toLocaleString() : 'Unknown'
         ]);
       }
 
@@ -90,6 +114,38 @@ export class ConsoleFormatter {
 
       if (summary.pods.abnormal.length > 10) {
         output.push(chalk.gray(`... and ${summary.pods.abnormal.length - 10} more abnormal pods`));
+      }
+    }
+
+    if (summary.pods.failed.length > 0) {
+      output.push('');
+      output.push(chalk.bold.red('Failed Pods Requiring Attention:'));
+
+      const failedTable = new Table({
+        head: [
+          chalk.bold('Pod Name'),
+          chalk.bold('Namespace'),
+          chalk.bold('Reason'),
+          chalk.bold('Node'),
+          chalk.bold('Start Time')
+        ],
+        colWidths: [28, 18, 26, 18, 22]
+      });
+
+      for (const pod of summary.pods.failed.slice(0, 10)) {
+        failedTable.push([
+          chalk.red(pod.name),
+          pod.namespace,
+          pod.reason || 'Unknown',
+          pod.nodeName || 'Unknown',
+          pod.startTime ? pod.startTime.toLocaleString() : 'Unknown'
+        ]);
+      }
+
+      output.push(failedTable.toString());
+
+      if (summary.pods.failed.length > 10) {
+        output.push(chalk.gray(`... and ${summary.pods.failed.length - 10} more failed pods`));
       }
     }
 

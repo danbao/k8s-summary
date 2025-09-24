@@ -30,25 +30,35 @@ export class SummaryAnalyzer {
       totalPods,
       podRestarts,
       abnormalPods,
+      phaseBreakdown,
       jobStats,
       eventStats
     ] = await Promise.all([
       this.podCollector.getTotalPodCount(namespace),
       this.podCollector.collectPodRestarts(hours, namespace),
       this.podCollector.collectAbnormalPods(namespace),
+      this.podCollector.collectPodPhaseBreakdown(namespace),
       this.jobCollector.collectJobs(hours, namespace),
       this.eventCollector.collectEvents(hours, namespace)
     ]);
+
+    const failedPods = abnormalPods.filter(pod => pod.status === 'Failed');
 
     const summary: SummaryData = {
       timeRange: {
         start: startTime,
         end: endTime
       },
+      context: {
+        namespace,
+        hours
+      },
       pods: {
         total: totalPods,
         restarted: podRestarts,
-        abnormal: abnormalPods
+        abnormal: abnormalPods,
+        failed: failedPods,
+        statusBreakdown: phaseBreakdown
       },
       jobs: {
         successful: jobStats.successful,
@@ -88,6 +98,10 @@ export class SummaryAnalyzer {
 
     if (summary.pods.abnormal.length > 0) {
       insights.push(`${summary.pods.abnormal.length} pods in abnormal state require attention`);
+    }
+
+    if (summary.pods.failed.length > 0) {
+      insights.push(`${summary.pods.failed.length} pods are in Failed phase - investigate recent crashes or node issues`);
     }
 
     if (summary.jobs.failed.length > 0) {

@@ -7,6 +7,8 @@ export class MarkdownFormatter {
     output.push('# K8S Daily Summary Report');
     output.push('');
     output.push(`**Time Range:** ${summary.timeRange.start.toLocaleString()} - ${summary.timeRange.end.toLocaleString()}`);
+    output.push(`**Namespace:** ${summary.context.namespace || 'All namespaces'}`);
+    output.push(`**Lookback Window:** Last ${summary.context.hours} hours`);
     output.push('');
 
     output.push(this.formatPodSummary(summary));
@@ -30,6 +32,18 @@ export class MarkdownFormatter {
     output.push(`- **Total Pods:** ${summary.pods.total}`);
     output.push(`- **Restarted Pods:** ${summary.pods.restarted.length}`);
     output.push(`- **Abnormal Pods:** ${summary.pods.abnormal.length}`);
+    output.push(`- **Failed Pods:** ${summary.pods.failed.length}`);
+
+    if (summary.pods.statusBreakdown.length > 0) {
+      output.push('');
+      output.push('### Phase Breakdown');
+      output.push('');
+      output.push('| Phase | Count |');
+      output.push('|-------|-------|');
+      for (const phase of summary.pods.statusBreakdown) {
+        output.push(`| ${phase.phase} | ${phase.count} |`);
+      }
+    }
 
     if (summary.pods.restarted.length > 0) {
       output.push('');
@@ -53,16 +67,35 @@ export class MarkdownFormatter {
       output.push('');
       output.push('### Abnormal Pods');
       output.push('');
-      output.push('| Pod Name | Namespace | Status | Reason |');
-      output.push('|----------|-----------|--------|--------|');
+      output.push('| Pod Name | Namespace | Status | Reason | Node | Start Time |');
+      output.push('|----------|-----------|--------|--------|------|------------|');
 
       for (const pod of summary.pods.abnormal.slice(0, 10)) {
-        output.push(`| ${pod.name} | ${pod.namespace} | ${pod.status} | ${pod.reason || 'Unknown'} |`);
+        const startTime = pod.startTime ? pod.startTime.toLocaleString() : 'Unknown';
+        output.push(`| ${pod.name} | ${pod.namespace} | ${pod.status} | ${pod.reason || 'Unknown'} | ${pod.nodeName || 'Unknown'} | ${startTime} |`);
       }
 
       if (summary.pods.abnormal.length > 10) {
         output.push('');
         output.push(`*... and ${summary.pods.abnormal.length - 10} more abnormal pods*`);
+      }
+    }
+
+    if (summary.pods.failed.length > 0) {
+      output.push('');
+      output.push('### Failed Pods');
+      output.push('');
+      output.push('| Pod Name | Namespace | Reason | Node | Start Time |');
+      output.push('|----------|-----------|--------|------|------------|');
+
+      for (const pod of summary.pods.failed.slice(0, 10)) {
+        const startTime = pod.startTime ? pod.startTime.toLocaleString() : 'Unknown';
+        output.push(`| ${pod.name} | ${pod.namespace} | ${pod.reason || 'Unknown'} | ${pod.nodeName || 'Unknown'} | ${startTime} |`);
+      }
+
+      if (summary.pods.failed.length > 10) {
+        output.push('');
+        output.push(`*... and ${summary.pods.failed.length - 10} more failed pods*`);
       }
     }
 

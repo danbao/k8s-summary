@@ -35,6 +35,7 @@ console.log('\n' + (allFilesExist ? '✅ All required files are present!' : '❌
 // Test that the main CLI can be required
 try {
   console.log('\nTesting CLI import...');
+  process.env.K8S_SUMMARY_SKIP_CONNECT = '1';
   require('../dist/index.js');
   console.log('✓ CLI can be imported successfully');
 } catch (error) {
