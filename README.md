@@ -1,356 +1,69 @@
 # K8S Daily Summary CLI
 
-English | [中文](./README_CN.md) | [Quick Start](./QUICK_START.md)
+`k8s-daily-summary` 是一个用 TypeScript 编写的 Kubernetes 巡检 CLI，可以在指定时间窗口内汇总 Pod、Job 与 Event 的关键指标，并以终端彩色表格、JSON、Markdown 或 HTML 的形式输出健康报告。
 
-A TypeScript-based command-line tool for collecting and summarizing daily Kubernetes cluster status. This tool helps you quickly understand the health of your K8s cluster by analyzing pod restarts, job failures, and warning events.
+## 亮点功能
+- **Pod 健康**：统计总量、阶段分布，列出发生重启、处于异常或失败状态的 Pod，并展示重启原因与时间。
+- **批处理作业**：统计成功/失败/活跃的 Job，为失败 Job 给出执行时长与失败原因。
+- **事件告警**：聚合 Warning 级别事件，呈现出现次数、关联对象以及最近发生时间。
+- **智能洞察**：自动生成 OOMKilled、CrashLoopBackOff 等高频问题提示，帮助快速定位风险。
+- **多格式输出**：支持 `console`、`json`、`markdown`、`html` 四种格式，可通过 `--output` 将结果落盘。
+- **灵活连接**：默认读取本地 kubeconfig，也支持通过 `--kubeconfig` 指定路径。
 
-## ✨ Features
-
-- **Pod Status Monitoring** 📊
-  - Track pod restarts with detailed reasons (OOMKilled, CrashLoopBackOff, etc.)
-  - Monitor abnormal pod states (Pending, Failed, Unknown)
-  - Display restart times and associated namespaces
-  
-- **Job Health Analysis** 🔍
-  - Statistics on successful/failed jobs
-  - Detailed failure reasons and execution duration
-  - CronJob execution status analysis
-  
-- **Event Aggregation** ⚠️
-  - Collect and summarize Warning-level events
-  - Group events by type and count occurrences
-  - Show event frequency and recent occurrence times
-  
-- **Multiple Output Formats** 📄
-  - **Console**: Colorized tables for terminal viewing
-  - **JSON**: Machine-readable format for integration
-  - **Markdown**: Perfect for generating reports
-  
-- **Flexible Configuration** ⚙️
-  - Customizable time ranges (default 24 hours)
-  - Namespace filtering
-  - Custom kubeconfig paths
-  - File output support
-
-## 🛠️ Installation
-
-### Prerequisites
-- Node.js 16+ and npm
-- Access to a Kubernetes cluster
-- Valid kubeconfig file
-- Appropriate RBAC permissions
-
-### Setup
-
+## 快速开始
 ```bash
-# Clone or download the project
-cd k8s-summary
-
-# Install dependencies
 npm install
-
-# Build the project
 npm run build
-```
 
-## 🚀 Usage
-
-### Basic Usage
-
-```bash
-# Analyze last 24 hours (default)
-npm run summary
-
-# Or use the built binary
-./dist/index.js
-
-# Or run in development mode
+# 以开发模式运行，统计最近 24 小时的所有命名空间
 npm run dev
 ```
 
-### Advanced Options
-
+常用命令示例：
 ```bash
-# Analyze specific time range
-npm run dev -- --hours 48
+# 指定时间范围与命名空间
+npm run dev -- --hours 12 --namespace production
 
-# Focus on specific namespace
-npm run dev -- --namespace production
+# 以 JSON 输出供自动化脚本解析
+npm run dev -- --format json
 
-# Output to JSON format
-npm run dev -- --format json --output summary.json
+# 生成 Markdown 报告并写入文件
+npm run dev -- --format markdown --output reports/daily.md
 
-# Output to Markdown
-npm run dev -- --format markdown --output report.md
-
-# Use custom kubeconfig
-npm run dev -- --kubeconfig ~/.kube/config-prod
-
-# Combine multiple options
-npm run dev -- --hours 12 --namespace default --format markdown --output daily-report.md
+# 生成 HTML 仪表板
+npm run dev -- --format html --output reports/daily.html
 ```
 
-### Command Line Options
+## 命令行参数
+| 参数 | 说明 | 默认值 |
+|------|------|---------|
+| `-h, --hours <number>` | 统计过去 N 小时的数据，必须为正整数 | 24 |
+| `-n, --namespace <string>` | 仅分析指定命名空间 | 所有命名空间 |
+| `-f, --format <format>` | 输出格式：`console` / `json` / `markdown` / `html` | `console` |
+| `-o, --output <file>` | 将结果写入指定文件路径 | 直接输出到终端 |
+| `-k, --kubeconfig <path>` | 指定 kubeconfig 文件 | 从默认位置加载 |
 
-| Option | Description | Default | Example |
-|--------|-------------|---------|---------|
-| `-h, --hours` | Number of hours to look back | 24 | `--hours 48` |
-| `-n, --namespace` | Specific namespace to analyze | All | `--namespace production` |
-| `-f, --format` | Output format: console/json/markdown | console | `--format json` |
-| `-o, --output` | Output file path | None (terminal) | `--output report.md` |
-| `-k, --kubeconfig` | Path to kubeconfig file | Default location | `--kubeconfig ~/.kube/config` |
+## 运行时细节
+- 连接测试：工具会先调用 Kubernetes API 列出命名空间验证连通性，失败时会立即退出并提示检查权限或 kubeconfig。
+- 环境变量：设置 `K8S_SUMMARY_SKIP_CONNECT=1` 可跳过集群连接流程（便于离线测试）。
+- 数据采集：Pod、Job、Event 统计会并发执行，可在较大集群中保持良好速度。
 
-## 📋 Example Output
+## 文档
+- 项目功能与使用说明：[`docs/功能与使用说明.md`](./docs/功能与使用说明.md)
 
-### Console Format
-```
-=== K8S Daily Summary Report ===
-Time Range: 2024-03-20 00:00 - 2024-03-21 00:00
-
-## Pod Status Summary
-- Total Pods: 150
-- Restarted Pods: 5
-- Abnormal Pods: 2
-
-Pod Restarts:
-┌──────────────────────────────┬────────────────────┬──────────┬──────────────────────┬─────────────────────────┐
-│ Pod Name                     │ Namespace          │ Restarts │ Reason               │ Last Restart            │
-├──────────────────────────────┼────────────────────┼──────────┼──────────────────────┼─────────────────────────┤
-│ app-backend-xyz              │ default            │ 3        │ OOMKilled            │ 3/20/2024, 10:30:00 AM │
-│ worker-abc                   │ jobs               │ 2        │ Error                │ 3/20/2024, 9:15:00 AM  │
-└──────────────────────────────┴────────────────────┴──────────┴──────────────────────┴─────────────────────────┘
-
-## Job Health Summary
-- Successful Jobs: 45
-- Failed Jobs: 2
-- Active Jobs: 3
-
-Failed Jobs:
-┌──────────────────────────────┬────────────────────┬──────────┬──────────────────────────────────────┐
-│ Job Name                     │ Namespace          │ Duration │ Failure Reason                       │
-├──────────────────────────────┼────────────────────┼──────────┼──────────────────────────────────────┤
-│ data-sync-job                │ default            │ 15m 30s  │ BackoffLimitExceeded                 │
-│ backup-job                   │ backup             │ 1h 5m    │ DeadlineExceeded                     │
-└──────────────────────────────┴────────────────────┴──────────┴──────────────────────────────────────┘
-
-## Event Summary
-- Warning Events: 12
-- Total Events: 156
-
-## Key Insights
-• Found 5 pods with restarts (total: 8 restarts)
-• 1 pods were OOMKilled - consider increasing memory limits
-• Most common warning: "BackOff" (5 occurrences)
-```
-
-### JSON Format Output
-```json
-{
-  "summary": {
-    "timeRange": {
-      "start": "2024-03-20T00:00:00.000Z",
-      "end": "2024-03-21T00:00:00.000Z"
-    },
-    "pods": {
-      "total": 150,
-      "restarted": [
-        {
-          "name": "app-backend-xyz",
-          "namespace": "default",
-          "restartCount": 3,
-          "reason": "OOMKilled",
-          "lastRestartTime": "2024-03-20T10:30:00.000Z"
-        }
-      ],
-      "abnormal": []
-    },
-    "jobs": {
-      "successful": 45,
-      "failed": [],
-      "active": 3
-    },
-    "events": {
-      "warnings": [],
-      "total": 156
-    }
-  },
-  "insights": [
-    "Found 5 pods with restarts (total: 8 restarts)",
-    "1 pods were OOMKilled - consider increasing memory limits"
-  ]
-}
-```
-
-## 🔐 Kubernetes Permissions
-
-Your service account or user needs the following permissions:
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: k8s-summary-reader
-rules:
-- apiGroups: [""]
-  resources: ["pods", "events", "namespaces"]
-  verbs: ["get", "list"]
-- apiGroups: ["batch"]
-  resources: ["jobs", "cronjobs"]
-  verbs: ["get", "list"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "replicasets"]
-  verbs: ["get", "list"]
-```
-
-Apply the permissions:
+## 开发与测试
 ```bash
-kubectl apply -f rbac.yaml
-kubectl create clusterrolebinding k8s-summary-binding \
-  --clusterrole=k8s-summary-reader \
-  --user=<your-username>
-```
-
-## 🏗️ Project Architecture
-
-```
-k8s-summary/
-├── src/
-│   ├── index.ts              # CLI entry point
-│   ├── types/                # TypeScript type definitions
-│   │   └── index.ts
-│   ├── collectors/           # Data collection modules
-│   │   ├── pod.ts           # Pod status collector
-│   │   ├── job.ts           # Job health collector
-│   │   └── event.ts         # Event collector
-│   ├── analyzers/           # Data analysis modules
-│   │   └── summary.ts       # Summary analyzer
-│   ├── formatters/          # Output formatters
-│   │   ├── console.ts       # Console output with colors
-│   │   └── markdown.ts      # Markdown output
-│   └── utils/              # Utility functions
-│       └── k8s-client.ts   # Kubernetes client wrapper
-├── dist/                   # Compiled JavaScript files
-├── scripts/               # Helper scripts
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## 🔧 Development
-
-### Development Setup
-
-```bash
-# Run in development mode
+# 开发模式
 npm run dev
 
-# Build the project
+# 构建生产版本
 npm run build
 
-# Run the built version
-npm start
-
-# Test project structure
+# 运行结构校验
 node scripts/test-structure.js
+
+# HTML Formatter 快速测试
+K8S_SUMMARY_SKIP_CONNECT=1 npm run dev -- --format html
 ```
 
-### Core Components
-
-1. **Collectors**
-   - `PodCollector`: Gathers pod restarts and abnormal states
-   - `JobCollector`: Monitors job and cronjob health
-   - `EventCollector`: Aggregates cluster events
-
-2. **Analyzers**
-   - `SummaryAnalyzer`: Generates comprehensive summaries and insights
-
-3. **Formatters**
-   - `ConsoleFormatter`: Creates colorized terminal output
-   - `MarkdownFormatter`: Generates markdown reports
-
-## ❗ Troubleshooting
-
-### Connection Issues
-```bash
-# Check cluster connectivity
-kubectl cluster-info
-
-# Verify kubeconfig
-kubectl config current-context
-
-# Test permissions
-kubectl auth can-i list pods --all-namespaces
-```
-
-### Common Errors and Solutions
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `ECONNREFUSED` | Cannot connect to cluster | Check network and kubeconfig |
-| `Forbidden` | Insufficient permissions | Configure proper RBAC permissions |
-| `No data returned` | No data in time range | Adjust time range or check cluster activity |
-| `Namespace not found` | Specified namespace doesn't exist | Use `kubectl get ns` to verify namespaces |
-
-### Debug Mode
-```bash
-# Enable verbose logging
-DEBUG=k8s-summary npm run dev
-
-# Test specific components
-npm run dev -- --namespace kube-system --hours 1
-```
-
-## 🎯 Use Cases
-
-### 1. Daily Health Checks
-```bash
-# Generate daily reports
-npm run dev -- --format markdown --output "reports/daily-$(date +%Y%m%d).md"
-```
-
-### 2. Incident Investigation
-```bash
-# Analyze recent issues
-npm run dev -- --hours 2 --namespace production
-```
-
-### 3. Scheduled Monitoring
-```bash
-# Integrate with cron jobs
-0 9 * * * cd /path/to/k8s-summary && npm run dev -- --format json --output /var/log/k8s-summary.json
-```
-
-### 4. CI/CD Integration
-```bash
-# Check cluster status after deployments
-npm run dev -- --hours 1 --format json | jq '.summary.pods.restarted | length'
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-### Development Guidelines
-- Use TypeScript for type safety
-- Follow existing code style
-- Add appropriate error handling
-- Write tests for new features
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details
-
-## 🙏 Acknowledgments
-
-- [Kubernetes JavaScript Client](https://github.com/kubernetes-client/javascript)
-- [Commander.js](https://github.com/tj/commander.js)
-- [cli-table3](https://github.com/cli-table/cli-table3)
-- [Chalk](https://github.com/chalk/chalk)
-
----
-
-If this tool helps you, please give it a ⭐ Star!
+欢迎基于 `src/analyzers/summary.ts`、`src/collectors/*` 与 `src/formatters/*` 扩展更多数据源或输出格式，提交改进建议或 PR！
