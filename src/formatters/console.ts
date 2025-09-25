@@ -1,5 +1,5 @@
 import Table from 'cli-table3';
-import * as chalk from 'chalk';
+import chalk from 'chalk';
 import { SummaryData } from '../types';
 
 export class ConsoleFormatter {

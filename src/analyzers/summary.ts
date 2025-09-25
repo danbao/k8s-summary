@@ -74,8 +74,8 @@ export class SummaryAnalyzer {
     return summary;
   }
 
-  async testConnection(): Promise<boolean> {
-    return await this.client.testConnection();
+  async testConnection(namespace?: string): Promise<boolean> {
+    return await this.client.testConnection(namespace);
   }
 
   generateInsights(summary: SummaryData): string[] {

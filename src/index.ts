@@ -43,6 +43,24 @@ program
         process.exit(1);
       }
 
+      // Initialize client early so we can infer namespace from kubeconfig if not provided
+      const client = new K8sClient(cliOptions.kubeconfig);
+
+      if (!cliOptions.namespace) {
+        // Env override
+        const envNs = process.env.K8S_SUMMARY_NAMESPACE || process.env.NAMESPACE || process.env.K8S_NAMESPACE;
+        if (envNs) {
+          cliOptions.namespace = envNs;
+          console.log(`No namespace provided; using env namespace: ${envNs}`);
+        } else {
+          const inferredNs = client.getCurrentContextNamespace();
+          if (inferredNs) {
+            cliOptions.namespace = inferredNs;
+            console.log(`No namespace provided; using current-context namespace: ${inferredNs}`);
+          }
+        }
+      }
+
       if (process.env.K8S_SUMMARY_SKIP_CONNECT === '1') {
         console.log('Skipping Kubernetes connection and summary generation (test mode).');
         return;
@@ -50,13 +68,17 @@ program
 
       console.log('Connecting to Kubernetes cluster...');
       
-      const client = new K8sClient(cliOptions.kubeconfig);
       const analyzer = new SummaryAnalyzer(client);
 
-      const connected = await analyzer.testConnection();
+      const connected = await analyzer.testConnection(cliOptions.namespace);
       if (!connected) {
         console.error('Error: Failed to connect to Kubernetes cluster');
         console.error('Please check your kubeconfig and cluster connectivity');
+        if (!cliOptions.namespace) {
+          console.error('Tip: Provide a namespace with --namespace <name> for namespace-scoped RBAC');
+          console.error('     Or set default: kubectl config set-context --current --namespace <name>');
+          console.error('     Or env var: K8S_SUMMARY_NAMESPACE=<name>');
+        }
         process.exit(1);
       }
 
